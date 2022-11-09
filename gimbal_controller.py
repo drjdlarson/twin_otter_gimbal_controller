@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import time
 from threading import Thread
-#import RPi.GPIO as GPIO
+import RPi.GPIO as GPIO
 
 
 class Stepper:
@@ -10,29 +10,32 @@ class Stepper:
         self.pul_pin = PUL
         self.dir_pin = DIR
         self.step_count = 0
-        self.degpstep = 0.016
-        self.last_time_ms = 0
+        self.degpstep = 0.16
+        self.delay_inc = 0.00001
+        self.last_time = 0
         self.pul_state = False
         self.delay = None
         self.thread_stop = False
+        GPIO.setup(self.pul_pin, GPIO.OUT, initial = GPIO.LOW)
+        GPIO.setup(self.dir_pin, GPIO.OUT, initial = GPIO.LOW)
     
     def run(self):
-        self.cur_time = time.time()
         while True:
             if self.thread_stop == True:
                 break
-            time.sleep (0.000001)
-            print (self.step_count * self.degpstep)
-            if self.delay is not None and self.cur_time - self.last_time_ms > self.delay and self.pul_state == False:
-                #GPIO.output(self.pul_pin, GPIO.HIGH)
+            self.cur_time = time.time()
+            time.sleep(0.0001)
+            if self.delay == 0:
+                self.delay = None
+            if self.delay is not None and self.cur_time - self.last_time > self.delay and self.pul_state == False:
+                GPIO.output(self.pul_pin, GPIO.HIGH)
                 self.pul_state = True
                 self.step_count += self.dir
-                #print("HIGH")
-            if self.delay is not None and self.cur_time - self.last_time_ms > self.delay and self.pul_state == True:
-                #GPIO.output(self.pul_pin, GPIO.LOW)
+                self.last_time = self.cur_time
+            elif self.delay is not None and self.cur_time - self.last_time > self.delay and self.pul_state == True:
+                GPIO.output(self.pul_pin, GPIO.LOW)
                 self.pul_state = False
-                #print("LOW")
-            self.last_time = self.cur_time
+                self.last_time = self.cur_time
 
     def start_rotation(self):
         self.thread = Thread(target=self.run)
@@ -49,26 +52,32 @@ class Stepper:
 
     def set_rate(self, rate_degps):
         if rate_degps > 0:
-            #GPIO.output(self.dir_pin, GPIO.HIGH)
-            print ("Dir HIGH")
+            GPIO.output(self.dir_pin, GPIO.HIGH)
             self.dir = 1
         else:
-            #GPIO.output(self.dir_pin, GPIO.LOW)
-            print ("Dir LOW")
+            GPIO.output(self.dir_pin, GPIO.LOW)
             self.dir = -1
         if rate_degps == 0:
             self.delay = None
         else:
-            self.delay = 0.016/rate_degps
+            self.delay = 0.00735/abs(rate_degps)
 
 if __name__ == "__main__":
+    GPIO.setwarnings(False)
+    GPIO.setmode(GPIO.BCM)
     xstepper = Stepper (2, 3)
+    ystepper = Stepper (19,26)
     print ("Stepper init\n")
+    ystepper.start_rotation()
     xstepper.start_rotation()
-    time.sleep(2)
-    print ("set speed\n")
+    time.sleep(0.5)
+    print ("set speed 1\n")
+    ystepper.set_rate(5.5)
     xstepper.set_rate(10)
     time.sleep(2)
-    xstepper.set_rate(-50)
-    time.sleep(2)
+    ystepper.set_rate(-10)
+    time.sleep(3)
+    ystepper.stop_stepper()
     xstepper.stop_stepper()
+
+    
