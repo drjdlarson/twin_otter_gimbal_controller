@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
+# Twin Otter gimbal controller code
+# Tuan Luong LAGER
+# 10/31/2022
 # -*- coding: utf-8 -*-
 import time
 from threading import Thread
 import RPi.GPIO as GPIO
+import xmlrpc.client
 
-
+## Defind Stepper motor class
 class Stepper:
     def __init__(self, PUL, DIR):
         self.pul_pin = PUL
@@ -68,17 +72,95 @@ class Stepper:
         else:
             self.delay = self.degpstep /abs(rate_degps)
 
-if __name__ == "__main__":
-    GPIO.setwarnings(False)
-    GPIO.setmode(GPIO.BCM)
-    xstepper = Stepper (2, 3)
-    ystepper = Stepper (19,26)
-    print ("Stepper init\n")
-    xstepper.start_rotation()
-    ystepper.start_rotation()
-    xstepper.set_rate(5)
-    ystepper.set_rate(15)
+## Set up interface with navigation box
+HOST = '169.254.2.166'
+PORT = '8000'
+HostURL ='http://'+HOST+":"+PORT
+backend = xmlrpc.client.ServerProxy(HostURL)   
+
+pitch_deg = 0
+roll_deg = 0
+    
+def checksum (sentence, chk_val):
+    try:
+        cksum = 0
+        for i in sentence:
+            cksum ^= ord(i)
+            s = '{:02X}'.format(cksum)
+        if s == chk_val:
+            return True
+        else:
+            return False
+    except:
+        return False
+
+
+def processVNINS(lineraw):
+    try:
+        splits = lineraw.split("*")
+        chksum_val = splits[1]
+        senstence = splits[0]
+        header_splits = senstence.split("$")
+        line = header_splits[1]
+        data = line.split(",")
+        if not checksum (line, chksum_val):
+            return False
+        global pitch_deg 
+        pitch_deg = data[5]
+        global roll_deg 
+        roll_deg = data[6]
+        return True
+    except:
+        return False
+
+## Main loop
+# Defind loop period
+loop_time_ms = 10 #100 Hz
+
+# Setup Raspberry PI GPIO for driving stepper motor
+GPIO.setwarnings(False)
+GPIO.setmode(GPIO.BCM)
+xstepper = Stepper (2, 3)
+ystepper = Stepper (19,26)
+xstepper.start_rotation()
+ystepper.start_rotation()
+
+while 1:
+    try:
+        loop_start_time_ms = time.time()
         
+        # Get Sensor feedback
+        try:
+            line = backend.getVNINS()
+        except:
+            continue
+        if line is None:
+            continue
+        if not processVNINS(line):
+            continue
+        print (pitch_deg," | ", roll_deg)
+
+        # Compute controller cmd
+        
+        # Output to motors
+        #xstepper.set_rate(xcmd)
+        #ystepper.set_rate(ycmd)     
+        
+        time.sleep((loop_time_ms - (time.time() - loop_start_time_ms))/1000) # Delay loop so we have constant loop period
+
+    # Reset everything incase of exception    
+    except Exception as e:
+        print("Exception:",e)
+        pitch_deg = 0
+        roll_deg = 0
+        backend = xmlrpc.client.ServerProxy(HostURL)   
+        GPIO.clearup()
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+        xstepper = Stepper (2, 3)
+        ystepper = Stepper (19,26)
+        xstepper.start_rotation()
+        ystepper.start_rotation()    
 
 
     
