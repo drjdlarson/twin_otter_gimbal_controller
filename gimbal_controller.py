@@ -143,8 +143,8 @@ while 1:
         # Compute controller cmd
         
         # Output to motors
-        #xstepper.set_rate(xcmd)
-        #ystepper.set_rate(ycmd)     
+        xstepper.set_rate(pitch_deg)
+        ystepper.set_rate(roll_deg)     
         
         time.sleep((loop_time_ms - (time.time() - loop_start_time_ms))/1000) # Delay loop so we have constant loop period
 
