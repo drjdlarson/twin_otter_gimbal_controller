@@ -78,6 +78,8 @@ PORT = '8000'
 HostURL ='http://'+HOST+":"+PORT
 backend = xmlrpc.client.ServerProxy(HostURL)   
 
+pitch_deg_str = 0
+roll_deg_str = 0
 pitch_deg = 0
 roll_deg = 0
     
@@ -105,10 +107,10 @@ def processVNINS(lineraw):
         data = line.split(",")
         if not checksum (line, chksum_val):
             return False
-        global pitch_deg 
-        pitch_deg = data[5]
-        global roll_deg 
-        roll_deg = data[6]
+        global pitch_deg_str 
+        pitch_deg_str = data[5]
+        global roll_deg_str 
+        roll_deg_str = data[6]
         return True
     except:
         return False
@@ -138,7 +140,9 @@ while 1:
             continue
         if not processVNINS(line):
             continue
-        print (pitch_deg," | ", roll_deg)
+        pitch_deg = float(pitch_deg_str)
+        roll_deg = float(roll_deg_str)
+        print (pitch_deg)
 
         # Compute controller cmd
         
