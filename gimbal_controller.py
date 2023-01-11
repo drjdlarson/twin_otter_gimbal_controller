@@ -60,6 +60,7 @@ class Stepper:
         return self.step_count
 
     def set_rate(self, rate_degps):
+        #self.start_rotation()
         GPIO.output(self.pul_pin, GPIO.LOW)
         if rate_degps > 0:
             GPIO.output(self.dir_pin, GPIO.HIGH)
@@ -69,6 +70,7 @@ class Stepper:
             self.dir = -1
         if rate_degps == 0:
             self.delay = None
+            #self.stop_stepper()
         else:
             self.delay = self.degpstep /abs(rate_degps)
 
@@ -76,12 +78,15 @@ class Stepper:
 HOST = '169.254.2.166'
 PORT = '8000'
 HostURL ='http://'+HOST+":"+PORT
-backend = xmlrpc.client.ServerProxy(HostURL)   
+backend = xmlrpc.client.ServerProxy(HostURL)
+print("Server initialized\n")
 
 pitch_deg_str = 0
 roll_deg_str = 0
 pitch_deg = 0
 roll_deg = 0
+trim_pitch = 0
+trim_roll = 0
     
 def checksum (sentence, chk_val):
     try:
@@ -117,12 +122,11 @@ def processVNINS(lineraw):
 
 ## Main loop
 # Defind loop period
-loop_time_ms = 10 #100 Hz
+loop_time_ms = 100 #10 Hz
 
 # Setup Raspberry PI GPIO for driving stepper motor
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
-bool calibrate_mode = False
 
 # Set GPIO pins
 mode_sw = 18
@@ -131,19 +135,28 @@ pitch_up_trim_but = 9
 pitch_dn_trim_but = 25
 roll_left_trim_but = 8
 roll_right_trim_but = 7
-xstepper = Stepper (2, 3)
+xstepper = Stepper (2,3)
 ystepper = Stepper (19,26)
+#xstepper.set_rate(0);
+#ystepper.set_rate(0);
 xstepper.start_rotation()
 ystepper.start_rotation()
+print ("Stepper initialized\n")
 GPIO.setup(mode_sw, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-
+GPIO.setup(calibrate_but, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(pitch_up_trim_but, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(pitch_dn_trim_but, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(roll_left_trim_but, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(roll_right_trim_but, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+print ("GPIO initialized\n")
 while 1:
     try:
-        loop_start_time_ms = time.time()
         
+        loop_start_time_ms = time.time()
         # Get Sensor feedback
         try:
             line = backend.getVNINS()
+            
         except:
             continue
         if line is None:
@@ -152,15 +165,32 @@ while 1:
             continue
         pitch_deg = float(pitch_deg_str)
         roll_deg = float(roll_deg_str)
-        
-        print(GPIO.input(mode_sw))
-        
+        # Calibration mode
+        if GPIO.input(mode_sw):
+            if not GPIO.input(pitch_up_trim_but):
+                ystepper.set_rate(5)
+            elif not GPIO.input(pitch_dn_trim_but):
+                ystepper.set_rate(-5)
+            elif not GPIO.input(roll_left_trim_but):
+                xstepper.set_rate(-5)
+                print("trim roll left")
+            elif not GPIO.input(roll_right_trim_but):
+                xstepper.set_rate(5)
+                print ("trim roll right")
+            elif not GPIO.input(calibrate_but):
+                xstepper.reset_step_count()
+                ystepper.reset_step_count()
+                trim_pitch = pitch_deg
+                trim_roll = roll_deg
+            else:
+                ystepper.set_rate(0)
+                xstepper.set_rate(0)
         # Compute controller cmd
         
-        # Output to motors
-        xstepper.set_rate(pitch_deg)
-        ystepper.set_rate(roll_deg)     
+        # Output to motors    
         
+        print (ystepper.get_angle())
+        # Time delay to keeo loop at constant rate
         time.sleep((loop_time_ms - (time.time() - loop_start_time_ms))/1000) # Delay loop so we have constant loop period
 
     # Reset everything incase of exception    
