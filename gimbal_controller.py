@@ -122,10 +122,20 @@ loop_time_ms = 10 #100 Hz
 # Setup Raspberry PI GPIO for driving stepper motor
 GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
+bool calibrate_mode = False
+
+# Set GPIO pins
+mode_sw = 18
+calibrate_but = 11
+pitch_up_trim_but = 9
+pitch_dn_trim_but = 25
+roll_left_trim_but = 8
+roll_right_trim_but = 7
 xstepper = Stepper (2, 3)
 ystepper = Stepper (19,26)
 xstepper.start_rotation()
 ystepper.start_rotation()
+GPIO.setup(mode_sw, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 while 1:
     try:
@@ -142,8 +152,9 @@ while 1:
             continue
         pitch_deg = float(pitch_deg_str)
         roll_deg = float(roll_deg_str)
-        print (pitch_deg)
-
+        
+        print(GPIO.input(mode_sw))
+        
         # Compute controller cmd
         
         # Output to motors
