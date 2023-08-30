@@ -173,7 +173,7 @@ def processVNINS(lineraw):
 
 ## Main loop
 # Defind loop period
-loop_time_s = 0.05  #10 Hz
+loop_time_s = 0.05  #20 Hz
 
 # Setup Raspberry PI GPIO for driving stepper motor
 GPIO.setwarnings(False)
