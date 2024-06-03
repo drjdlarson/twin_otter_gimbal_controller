@@ -173,7 +173,7 @@ def processVNINS(lineraw):
 
 ## Main loop
 # Defind loop period
-loop_time_s = 0.05  #20 Hz
+loop_time_s = 0.05  #10 Hz
 
 # Setup Raspberry PI GPIO for driving stepper motor
 GPIO.setwarnings(False)
@@ -221,6 +221,7 @@ while 1:
         plane_pitch_deg = float(plane_pitch_deg_str)
         plane_roll_deg = float(plane_roll_deg_str)
         
+        
         # Read rotary angle
         try:
             with serial.Serial(rotary_port, rotary_baud, timeout = 5) as ser:
@@ -228,25 +229,31 @@ while 1:
                 rotary_buf = ser.readline()
                 rotary_str = rotary_buf.decode()
                 rotary_splits = rotary_str.split(",")
+                print (rotary_splits)
                 rotary_roll = float(rotary_splits[1])
                 rotary_pitch = float(rotary_splits[2])
-        except:
-            #print ("No rotary value")
+                #print(rotary_roll)
+                
+        except Exception as e:
+            ystepper.set_rate(0)
+            xstepper.set_rate(0)
+            print ("No rotary value")
             continue
         ystepper.set_angle_pos(rotary_pitch - rotary_pitch_center)
         xstepper.set_angle_pos(rotary_roll - rotary_roll_center)
         # Calibration mode
         if GPIO.input(mode_sw):
             if not GPIO.input(pitch_up_trim_but):
-                ystepper.set_rate(1)
+                ystepper.set_rate(5)
             elif not GPIO.input(pitch_dn_trim_but):
-                ystepper.set_rate(-1)
+                ystepper.set_rate(-5)
             elif not GPIO.input(roll_left_trim_but):
-                xstepper.set_rate(-1)
+                xstepper.set_rate(-5)
             elif not GPIO.input(roll_right_trim_but):
-                xstepper.set_rate(1)
+                xstepper.set_rate(5)
             elif not GPIO.input(calibrate_but):
                 # TODO: Maybe calculate conversion between plane and angle once
+                print("Calibration angle set")
                 trim_plane_gimbal_pitch = - plane_pitch_deg
                 trim_plane_gimbal_roll = - plane_roll_deg 
                 with open ('/home/pi/calib.txt', mode='w') as f:
@@ -268,7 +275,7 @@ while 1:
         else:
             inertial_pitch = plane_pitch_deg + trim_plane_gimbal_pitch + rotary_pitch - rotary_pitch_center
             inertial_roll = plane_roll_deg + trim_plane_gimbal_roll + rotary_roll - rotary_roll_center
-            print(inertial_pitch)
+            #print(inertial_pitch)
             try:
                 backend.record_gimbal_angles(inertial_pitch, inertial_roll)
             except Exception as e:
@@ -294,6 +301,7 @@ while 1:
         try:
             time.sleep(loop_time_s - (time.time() - loop_start_time_s)) # Delay loop so we have constant loop period
         except:
+            print("In timout exception")
             continue
 
     # Reset everything incase of exception    
@@ -343,4 +351,3 @@ while 1:
         
 
     
-
